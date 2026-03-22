@@ -183,11 +183,19 @@ GT_GPUS = "-1"
 
 SOURCE_TYPE = "npy"
 
-INPUT_FILES = [
-    Path("/downloaded/data/en/embs/emb_000.npy"),
-    Path("/downloaded/data/en/embs/emb_001.npy"),
-    Path("/downloaded/data/en/embs/emb_002.npy"),
-]
+dataset_root = os.environ.get("DATASET_ROOT")
+if not dataset_root:
+    raise RuntimeError(
+        "DATASET_ROOT is not set. "
+        "Example: export DATASET_ROOT=/path/to/your/datasets"
+    )
+
+DATASET_ROOT = Path(dataset_root)
+DATASET_NAME = "mpnet-43m" # Just an example.  Put whatever you'd like
+EMBED_SUBDIR = "data/en/embs"
+
+DATASET_DIR = DATASET_ROOT / DATASET_NAME / EMBED_SUBDIR
+INPUT_FILES = [DATASET_DIR / f"emb_{i:03d}.npy" for i in range(10)] # Match the file naming conventions from your download
 ```
 
 ## Notes on output
