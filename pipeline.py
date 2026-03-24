@@ -2,6 +2,7 @@
 
 import json
 import logging
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ from config import (
     CLEANUP_INTERMEDIATE_FVECS,
     DATASET_NAME,
     DEDUP_BASE_FVECS,
+    DEDUP_TEMP_DIR,
     DEDUP_CMD,
     DEDUP_REPORT,
     FILE_PREFIX,
@@ -34,7 +36,9 @@ from config import (
     RUN_DIR,
     SOURCE_TYPE,
     SPLIT_BASE_FVECS,
+    SPLIT_BPARTS_DIR,
     SPLIT_CMD,
+    SPLIT_QPARTS_DIR,
     SPLIT_QUERY_FVECS,
     SUMMARY_FILE,
     NORMALIZED_BASE_FVECS,
@@ -288,6 +292,11 @@ def safe_delete(path: Path, logger: logging.Logger) -> None:
         path.unlink()
         logger.info("Deleted intermediate file: %s", path)
 
+def safe_delete_dir(path: Path, logger: logging.Logger) -> None:
+    if path.exists():
+        shutil.rmtree(path)
+        logger.info("Deleted temporary directory: %s", path)
+
 def safe_rename(src: Path, dst: Path, logger: logging.Logger) -> None:
     if not src.exists():
         raise FileNotFoundError(f"Cannot rename missing file: {src}")
@@ -347,6 +356,9 @@ def main() -> None:
         if CLEANUP_INTERMEDIATE_FVECS:
             safe_delete(NORMALIZED_BASE_FVECS, logger)
 
+        if DEDUP_TEMP_DIR.exists():
+            safe_delete_dir(DEDUP_TEMP_DIR, logger)
+
         summary["stages"]["split_queries"] = run_external_stage(
             logger,
             "split_queries",
@@ -355,6 +367,11 @@ def main() -> None:
         )
         if CLEANUP_INTERMEDIATE_FVECS:
             safe_delete(DEDUP_BASE_FVECS, logger)
+
+        if SPLIT_QPARTS_DIR.exists():
+            safe_delete_dir(SPLIT_QPARTS_DIR, logger)
+        if SPLIT_BPARTS_DIR.exists():
+            safe_delete_dir(SPLIT_BPARTS_DIR, logger)
 
         summary["stages"]["ground_truth"] = run_external_stage(
             logger,
