@@ -1,20 +1,21 @@
 from pathlib import Path
 import sys
-from dotenv import load_dotenv
+
+from processing_configs import Caselaw_gte_Qwen2_1_5B_embeddings_1m_proc as dataset
 
 # ------------------------------------------------------------
 # Run configuration
 # ------------------------------------------------------------
 
-RUN_NAME = "wiki_mpnet_10m"
-FILE_PREFIX = "wiki_mpnet_embeddings"
-CLEANUP_INTERMEDIATE_FVECS = True # Will delete intermediate files produced by zero removal, etc.
-
-RUN_DIR = Path("runs") / RUN_NAME
+RUN_DIR = dataset.OUTPUT_DIR
+FILE_PREFIX = dataset.FILE_PREFIX
+CLEANUP_INTERMEDIATE_FVECS = dataset.CLEANUP_INTERMEDIATE_FVECS
+OVERWRITE = dataset.OVERWRITE
 
 # ------------------------------------------------------------
-# Working files.  Do not update.
+# Working files. Do not update.
 # ------------------------------------------------------------
+
 RAW_BASE_FVECS = RUN_DIR / f"{FILE_PREFIX}_raw_base.fvecs"
 NONZERO_BASE_FVECS = RUN_DIR / f"{FILE_PREFIX}_nonzero_base.fvecs"
 NORMALIZED_BASE_FVECS = RUN_DIR / f"{FILE_PREFIX}_normalized_base.fvecs"
@@ -26,49 +27,140 @@ SPLIT_BPARTS_DIR = Path(f"{DEDUP_BASE_FVECS.with_suffix('')}_bparts")
 GT_PROCESSED_BASE_FVECS = RUN_DIR / f"{FILE_PREFIX}_gt_processed_base.fvecs"
 GT_PROCESSED_QUERY_FVECS = RUN_DIR / f"{FILE_PREFIX}_gt_processed_query.fvecs"
 GROUND_TRUTH_FILE = RUN_DIR / "ground_truth.ivecs"
-# ------------------------------------------------------------
 
 DEDUP_REPORT = RUN_DIR / f"{FILE_PREFIX}_dedup_report.txt"
 DEDUP_TEMP_DIR = RUN_DIR / f"{FILE_PREFIX}_dedup_temp"
 
-NUM_QUERY = 10000 # Set an integer target number.  The final count may be less due to zero removal and dedup.
-NUM_BASE = 10000000  # set an integer for truncation (otherwise all listed input files will be processed.  The final count may be less due to zero removal and dedup.
-GT_K = 100
-GT_METRIC = "ip"      # "ip" or "l2"
-GT_SHUFFLE = True
-GT_GPUS = "-1"        # "-1" for CPU, e.g. "0" for one GPU, "0,1" for multi-GPU
-
-FINAL_GROUND_TRUTH = RUN_DIR / f"{FILE_PREFIX}_gt_{GT_METRIC}_{GT_K}.ivecs"
-
 LOG_FILE = RUN_DIR / "pipeline.log"
 SUMMARY_FILE = RUN_DIR / "summary.json"
 
-OVERWRITE = False
+# ------------------------------------------------------------
+# Requested output sizes
+# ------------------------------------------------------------
+
+NUM_QUERY = dataset.NUM_QUERY
+NUM_BASE = dataset.NUM_BASE
+
+# ------------------------------------------------------------
+# Ground truth
+# ------------------------------------------------------------
+
+GT_K = dataset.GT_K
+GT_METRIC = dataset.GT_METRIC
+GT_SHUFFLE = dataset.GT_SHUFFLE
+GT_GPUS = dataset.GT_GPUS
+
+FINAL_GROUND_TRUTH = RUN_DIR / f"{FILE_PREFIX}_gt_{GT_METRIC}_{GT_K}.ivecs"
 
 # ------------------------------------------------------------
 # Input data
 # ------------------------------------------------------------
 
-SOURCE_TYPE = "npy"
+SOURCE_TYPE = dataset.SOURCE_TYPE
+PARQUET_EMBEDDING_COLUMN = dataset.PARQUET_EMBEDDING_COLUMN
 
-from pathlib import Path
-import os
+INPUT_DIR = dataset.INPUT_DIR
+SELECTION_MODE = dataset.SELECTION_MODE
+FIRST_N = dataset.FIRST_N
+EXPLICIT_INPUT_FILES = dataset.EXPLICIT_INPUT_FILES
+SELECT_SUBSTRINGS = dataset.SELECT_SUBSTRINGS
+EXCLUDE_SUBSTRINGS = dataset.EXCLUDE_SUBSTRINGS
+ALLOWED_SUFFIXES = dataset.ALLOWED_SUFFIXES
 
-# Load the .env file from the current directory
-load_dotenv()
 
-dataset_root = os.environ.get("DATASET_ROOT")
-if not dataset_root:
-    raise RuntimeError(
-        "DATASET_ROOT is not set. "
-        "Example: export DATASET_ROOT=/path/to/your/datasets"
+def discover_input_files(input_dir: Path) -> list[Path]:
+    return sorted(path for path in input_dir.rglob("*") if path.is_file())
+
+
+def matches_any_substring(path: str, needles: list[str]) -> bool:
+    if not needles:
+        return True
+    return any(needle in path for needle in needles)
+
+
+def matches_any_suffix(path: str, suffixes: list[str]) -> bool:
+    if not suffixes:
+        return True
+    return any(path.endswith(suffix) for suffix in suffixes)
+
+
+def filter_input_files(
+    files: list[Path],
+    input_dir: Path,
+    select_substrings: list[str],
+    exclude_substrings: list[str],
+    allowed_suffixes: list[str],
+) -> list[Path]:
+    selected = []
+    for path in files:
+        rel = path.relative_to(input_dir).as_posix()
+
+        if not matches_any_substring(rel, select_substrings):
+            continue
+        if exclude_substrings and any(s in rel for s in exclude_substrings):
+            continue
+        if not matches_any_suffix(rel, allowed_suffixes):
+            continue
+
+        selected.append(path)
+
+    return selected
+
+
+def resolve_input_files(
+    input_dir: Path,
+    selection_mode: str,
+    first_n: int | None,
+    explicit_input_files: list[str],
+    select_substrings: list[str],
+    exclude_substrings: list[str],
+    allowed_suffixes: list[str],
+) -> list[Path]:
+    if selection_mode == "explicit":
+        resolved = []
+        for entry in explicit_input_files:
+            path = Path(entry)
+            if not path.is_absolute():
+                path = input_dir / path
+            resolved.append(path)
+        return resolved
+
+    files = discover_input_files(input_dir)
+
+    if selection_mode == "all":
+        return files
+
+    filtered = filter_input_files(
+        files,
+        input_dir,
+        select_substrings,
+        exclude_substrings,
+        allowed_suffixes,
     )
-DATASET_ROOT = Path(dataset_root)
-DATASET_NAME = "mpnet-43m" # Just an example.  Put whatever you'd like
-EMBED_SUBDIR = "data/en/embs"
 
-DATASET_DIR = DATASET_ROOT / DATASET_NAME / EMBED_SUBDIR
-INPUT_FILES = [DATASET_DIR / f"emb_{i:03d}.npy" for i in range(12)] # Match the file naming conventions from your download
+    if selection_mode == "pattern":
+        return filtered
+
+    if selection_mode == "first_n":
+        if first_n is None or first_n <= 0:
+            raise ValueError("FIRST_N must be a positive integer when SELECTION_MODE='first_n'")
+        return filtered[:first_n]
+
+    raise ValueError(
+        "Unsupported SELECTION_MODE. Expected one of: "
+        "'all', 'first_n', 'explicit', 'pattern'"
+    )
+
+
+INPUT_FILES = resolve_input_files(
+    INPUT_DIR,
+    SELECTION_MODE,
+    FIRST_N,
+    EXPLICIT_INPUT_FILES,
+    SELECT_SUBSTRINGS,
+    EXCLUDE_SUBSTRINGS,
+    ALLOWED_SUFFIXES,
+)
 
 # ------------------------------------------------------------
 # External stage commands

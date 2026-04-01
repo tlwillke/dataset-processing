@@ -9,7 +9,6 @@ from pathlib import Path
 
 from config import (
     CLEANUP_INTERMEDIATE_FVECS,
-    DATASET_NAME,
     DEDUP_BASE_FVECS,
     DEDUP_TEMP_DIR,
     DEDUP_CMD,
@@ -31,6 +30,7 @@ from config import (
     NUM_BASE,
     NUM_QUERY,
     OVERWRITE,
+    PARQUET_EMBEDDING_COLUMN,
     RAW_BASE_FVECS,
     REMOVE_ZEROS_CMD,
     RUN_DIR,
@@ -72,11 +72,15 @@ def setup_logger(log_file: Path) -> logging.Logger:
 
 
 def validate_input_files() -> None:
+    if not INPUT_FILES:
+        raise FileNotFoundError("No input files were selected for processing.")
+
     missing = [p for p in INPUT_FILES if not p.exists()]
     if missing:
         raise FileNotFoundError(
             "Missing input files:\n" + "\n".join(str(p) for p in missing)
         )
+
 
 def extract_base_vectors(logger: logging.Logger) -> dict:
     RAW_BASE_FVECS.parent.mkdir(parents=True, exist_ok=True)
@@ -96,6 +100,9 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
             )
             return {
                 "skipped": True,
+                "file_prefix": FILE_PREFIX,
+                "source_type": SOURCE_TYPE,
+                "parquet_embedding_column": PARQUET_EMBEDDING_COLUMN,
                 "vectors_written": count,
                 "dim": dim,
                 "output_file": str(RAW_BASE_FVECS),
@@ -103,7 +110,7 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
 
     validate_input_files()
 
-    reader = build_reader(SOURCE_TYPE, INPUT_FILES)
+    reader = build_reader(SOURCE_TYPE, INPUT_FILES, PARQUET_EMBEDDING_COLUMN)
     logger.info("Reader description: %s", reader.describe())
 
     requested_initial_vectors = None if NUM_BASE is None else (NUM_BASE + NUM_QUERY)
@@ -142,10 +149,16 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
         total_vectors += batch_vectors
         batch_count += 1
 
+        current_file = getattr(reader, "current_file", None)
+        if current_file is None and batch_idx < len(INPUT_FILES):
+            current_file = INPUT_FILES[batch_idx]
+
+        file_label = Path(current_file).name if current_file is not None else "<unknown>"
+
         logger.info(
             "Progress: batch=%d file=%s batch_vectors=%d total_vectors=%d dim=%d",
             batch_idx,
-            INPUT_FILES[batch_idx],
+            file_label,
             batch_vectors,
             total_vectors,
             dim,
@@ -161,7 +174,7 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
         raise ValueError(
             f"Requested NUM_BASE={NUM_BASE} and NUM_QUERY={NUM_QUERY}, "
             f"so at least {requested_initial_vectors} input vectors are required, "
-            f"but only {final_count} were available from the listed input files."
+            f"but only {final_count} were available from the selected input files."
         )
 
     if final_count != total_vectors or final_dim != dim:
@@ -173,8 +186,9 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
 
     return {
         "skipped": False,
-        "dataset_name": DATASET_NAME,
+        "file_prefix": FILE_PREFIX,
         "source_type": SOURCE_TYPE,
+        "parquet_embedding_column": PARQUET_EMBEDDING_COLUMN,
         "input_files": [str(p) for p in INPUT_FILES],
         "num_input_files": len(INPUT_FILES),
         "num_batches": batch_count,
@@ -184,6 +198,7 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
         "limit_reached": limit_reached,
         "output_file": str(RAW_BASE_FVECS),
     }
+
 
 def run_external_stage(
     logger: logging.Logger,
@@ -273,6 +288,7 @@ def run_external_stage(
     logger.info("Finished external stage: %s in %.3f seconds", stage_name, elapsed)
     return result
 
+
 def count_output_file(path: Path) -> tuple[int, int]:
     suffix = path.suffix.lower()
 
@@ -287,15 +303,18 @@ def count_output_file(path: Path) -> tuple[int, int]:
 
     raise ValueError(f"Unsupported output file type for counting: {path}")
 
+
 def safe_delete(path: Path, logger: logging.Logger) -> None:
     if path.exists():
         path.unlink()
         logger.info("Deleted intermediate file: %s", path)
 
+
 def safe_delete_dir(path: Path, logger: logging.Logger) -> None:
     if path.exists():
         shutil.rmtree(path)
         logger.info("Deleted temporary directory: %s", path)
+
 
 def safe_rename(src: Path, dst: Path, logger: logging.Logger) -> None:
     if not src.exists():
@@ -305,14 +324,16 @@ def safe_rename(src: Path, dst: Path, logger: logging.Logger) -> None:
     src.rename(dst)
     logger.info("Renamed final artifact: %s -> %s", src, dst)
 
+
 def main() -> None:
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     logger = setup_logger(LOG_FILE)
 
     logger.info("Starting pipeline run")
     logger.info("Run directory: %s", RUN_DIR)
-    logger.info("Dataset name: %s", DATASET_NAME)
+    logger.info("File prefix: %s", FILE_PREFIX)
     logger.info("Source type: %s", SOURCE_TYPE)
+    logger.info("Parquet embedding column: %s", PARQUET_EMBEDDING_COLUMN)
 
     start = time.time()
     success = True

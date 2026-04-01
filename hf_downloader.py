@@ -1,59 +1,70 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
 from typing import Iterable, Optional
 from huggingface_hub import HfApi, snapshot_download
 
-from config import DATASET_ROOT, DATASET_NAME
+# Change only this import to choose which repo config to run.
+from download_configs import wiki_mpnet_download as repo
 
 # ============================================================
 # Configuration
+# All downloader settings come from the selected repo config.
 # ============================================================
 
-# Hugging Face repo settings
-REPO_ID = "olmer/wiki_mpnet_embeddings"
-REPO_TYPE = "dataset"          # "dataset", "model", or "space"
-REVISION = "main"
-TOKEN = None                   # Set for private/gated repos if needed
+REPO_ID = repo.REPO_ID
+REPO_TYPE = repo.REPO_TYPE
+REVISION = repo.REVISION
+TOKEN = repo.TOKEN
 
-# Local download settings
-LOCAL_DIR = Path(DATASET_ROOT / DATASET_NAME) # From config.py
-MAX_WORKERS = 16               # Parallel download workers
-DRY_RUN = True                # True = list selected files only, no download
+LOCAL_DIR = repo.LOCAL_DIR
+MAX_WORKERS = repo.MAX_WORKERS
+DRY_RUN = repo.DRY_RUN
 
-# Listing behavior
-PRINT_ALL_FILES = True         # Print every file in the repo
-PRINT_SELECTED_FILES = True    # Print only the chosen subset
+PRINT_ALL_FILES = repo.PRINT_ALL_FILES
+PRINT_SELECTED_FILES = repo.PRINT_SELECTED_FILES
 
-# ------------------------------------------------------------
-# File selection controls
-# ------------------------------------------------------------
-# A file is selected if:
-#   1) it matches ANY SELECT_SUBSTRINGS (or all files if empty)
-#   2) it does NOT match any EXCLUDE_SUBSTRINGS
-#   3) it ends with one of ALLOWED_SUFFIXES (or any suffix if empty)
+# Selection mode:
+#   "all"
+#       Download every file in the repo.
+#       Example:
+#           SELECTION_MODE = "all"
 #
-# Examples:
-#   SELECT_SUBSTRINGS = ["data/en/embs/emb_"]
-#   SELECT_SUBSTRINGS = ["data/en/embs/emb_", "data/en/embs/ids_"]
-#   SELECT_SUBSTRINGS = ["data/en/paragraphs.zip"]
+#   "first_n"
+#       Download the first N files after optional pattern filtering.
+#       Useful when you want a small prefix of a large repo.
+#       Example:
+#           SELECTION_MODE = "first_n"
+#           FIRST_N = 12
+#           ALLOWED_SUFFIXES = [".npy"]
 #
-SELECT_SUBSTRINGS = [
-    # "emb_000.npy",
-    # "emb_001.npy",
-    # "emb_002.npy",
-    # "data/en/embs/ids_",
-    # "data/en/paragraphs.zip",
-]
+#   "explicit"
+#       Download exactly the listed repo-relative file paths.
+#       Example:
+#           SELECTION_MODE = "explicit"
+#           EXPLICIT_FILES = [
+#               "data/en/embs/emb_000.npy",
+#               "data/en/embs/emb_001.npy",
+#           ]
+#
+#   "pattern"
+#       Download files selected by substring/suffix filters.
+#       Example:
+#           SELECTION_MODE = "pattern"
+#           SELECT_SUBSTRINGS = ["data/en/embs/"]
+#           EXCLUDE_SUBSTRINGS = ["train"]
+#           ALLOWED_SUFFIXES = [".parquet"]
+SELECTION_MODE = repo.SELECTION_MODE
 
-EXCLUDE_SUBSTRINGS = [
-    # ".md",
-]
+# Used only when SELECTION_MODE == "first_n".
+FIRST_N = repo.FIRST_N
 
-ALLOWED_SUFFIXES = [
-    # ".npy",
-    # ".zip",
-]
+# Used only when SELECTION_MODE == "explicit".
+EXPLICIT_FILES = repo.EXPLICIT_FILES
+
+# Used only when SELECTION_MODE == "first_n" or "pattern".
+SELECT_SUBSTRINGS = repo.SELECT_SUBSTRINGS
+EXCLUDE_SUBSTRINGS = repo.EXCLUDE_SUBSTRINGS
+ALLOWED_SUFFIXES = repo.ALLOWED_SUFFIXES
 
 # ============================================================
 # Functions
@@ -66,10 +77,12 @@ def list_repo_files(
     token: Optional[str] = None,
 ) -> list[str]:
     api = HfApi(token=token)
-    return api.list_repo_files(
-        repo_id=repo_id,
-        repo_type=repo_type,
-        revision=revision,
+    return sorted(
+        api.list_repo_files(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            revision=revision,
+        )
     )
 
 
@@ -87,7 +100,7 @@ def matches_any_suffix(path: str, suffixes: Iterable[str]) -> bool:
     return any(path.endswith(s) for s in suffixes)
 
 
-def select_files(
+def filter_files(
     files: list[str],
     select_substrings: Optional[Iterable[str]] = None,
     exclude_substrings: Optional[Iterable[str]] = None,
@@ -110,10 +123,54 @@ def select_files(
     return selected
 
 
+def select_files(
+    files: list[str],
+    selection_mode: str,
+    first_n: Optional[int] = None,
+    explicit_files: Optional[Iterable[str]] = None,
+    select_substrings: Optional[Iterable[str]] = None,
+    exclude_substrings: Optional[Iterable[str]] = None,
+    allowed_suffixes: Optional[Iterable[str]] = None,
+) -> list[str]:
+    explicit_files = list(explicit_files or [])
+
+    if selection_mode == "all":
+        return list(files)
+
+    if selection_mode == "explicit":
+        missing = [path for path in explicit_files if path not in files]
+        if missing:
+            raise FileNotFoundError(
+                "The following EXPLICIT_FILES were not found in the repo:\n"
+                + "\n".join(missing)
+            )
+        return explicit_files
+
+    filtered = filter_files(
+        files=files,
+        select_substrings=select_substrings,
+        exclude_substrings=exclude_substrings,
+        allowed_suffixes=allowed_suffixes,
+    )
+
+    if selection_mode == "pattern":
+        return filtered
+
+    if selection_mode == "first_n":
+        if first_n is None or first_n <= 0:
+            raise ValueError("FIRST_N must be a positive integer when SELECTION_MODE='first_n'")
+        return filtered[:first_n]
+
+    raise ValueError(
+        "Unsupported SELECTION_MODE. Expected one of: "
+        "'all', 'first_n', 'explicit', 'pattern'"
+    )
+
+
 def download_selected_files(
     repo_id: str,
     selected_files: list[str],
-    local_dir: Path,
+    local_dir,
     repo_type: str = "dataset",
     revision: str = "main",
     token: Optional[str] = None,
@@ -121,8 +178,6 @@ def download_selected_files(
 ) -> str:
     local_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use exact selected repo paths as allow_patterns.
-    # snapshot_download will download them concurrently.
     return snapshot_download(
         repo_id=repo_id,
         repo_type=repo_type,
@@ -155,6 +210,9 @@ def main() -> None:
 
     selected = select_files(
         files=files,
+        selection_mode=SELECTION_MODE,
+        first_n=FIRST_N,
+        explicit_files=EXPLICIT_FILES,
         select_substrings=SELECT_SUBSTRINGS,
         exclude_substrings=EXCLUDE_SUBSTRINGS,
         allowed_suffixes=ALLOWED_SUFFIXES,
@@ -167,7 +225,7 @@ def main() -> None:
             print(f)
 
     if not selected:
-        print("\nNo files matched the configured filters.")
+        print("\nNo files matched the configured selection.")
         return
 
     if DRY_RUN:
