@@ -4,6 +4,7 @@ OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/esmc-600-1m")
 
 FILE_PREFIX = "esmc_600_embeddings"
 SOURCE_TYPE = "parquet"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
 PARQUET_EMBEDDING_COLUMN = "mean_embedding"
 
 INPUT_DIR = Path("/mnt/raid10/datasets-ash/downloads/esmc-embeddings/data")

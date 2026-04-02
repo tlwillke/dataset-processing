@@ -4,6 +4,7 @@ OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/tahoe-x1-1m")
 
 FILE_PREFIX = "tahoe_x1_embeddings"
 SOURCE_TYPE = "parquet"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
 PARQUET_EMBEDDING_COLUMN = "mosaicfm-3b-prod-cont-MFMv2"
 
 INPUT_DIR = Path("/mnt/raid10/datasets-ash/downloads/tahoe-x1-100m/data")

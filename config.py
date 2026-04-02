@@ -1,7 +1,7 @@
 from pathlib import Path
 import sys
 
-from processing_configs import personahub_10m_proc as dataset
+from processing_configs import dpr_1m_proc as dataset
 
 # ------------------------------------------------------------
 # Run configuration
@@ -57,6 +57,7 @@ FINAL_GROUND_TRUTH = RUN_DIR / f"{FILE_PREFIX}_gt_{GT_METRIC}_{GT_K}.ivecs"
 # ------------------------------------------------------------
 
 SOURCE_TYPE = dataset.SOURCE_TYPE
+READER_BATCH_SIZE = dataset.READER_BATCH_SIZE
 PARQUET_EMBEDDING_COLUMN = dataset.PARQUET_EMBEDDING_COLUMN
 
 INPUT_DIR = dataset.INPUT_DIR

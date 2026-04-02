@@ -4,6 +4,7 @@ OUTPUT_DIR = Path("/mnt/raid10/datasets-ash/temp/mpnet-temp")
 
 FILE_PREFIX = "wiki_mpnet_embeddings"
 SOURCE_TYPE = "npy"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
 PARQUET_EMBEDDING_COLUMN = None
 
 INPUT_DIR = Path("/mnt/raid10/datasets-ash/temp/mpnet-temp")

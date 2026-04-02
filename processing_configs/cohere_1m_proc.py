@@ -1,9 +1,10 @@
 from pathlib import Path
 
-OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/cohere-1m")
+OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/temp")
 
 FILE_PREFIX = "cohere_msmarco-v2-embed-english-v3"
 SOURCE_TYPE = "fvecs"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
 PARQUET_EMBEDDING_COLUMN = None
 
 INPUT_DIR = Path("/home/ted_willke/Projects/vector-datasets/cohere-msmarco-138m")

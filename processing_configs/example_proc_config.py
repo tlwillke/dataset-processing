@@ -22,6 +22,10 @@ FILE_PREFIX = "example_dataset_prefix"
 # Expected values in your current code: "npy" or "parquet"
 SOURCE_TYPE = "npy"
 
+# Tune the reader batch size for RAM vs throughput.
+# Reduce for high-dimensional embeddings.
+READER_BATCH_SIZE = 32768
+
 # Used only when SOURCE_TYPE == "parquet".
 # Set to None for .npy datasets.
 PARQUET_EMBEDDING_COLUMN = None

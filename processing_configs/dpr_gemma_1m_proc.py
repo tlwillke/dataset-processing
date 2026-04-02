@@ -4,6 +4,7 @@ OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/dpr-gemma-1m")
 
 FILE_PREFIX = "dpr_gemma"
 SOURCE_TYPE = "parquet"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
 PARQUET_EMBEDDING_COLUMN = "embedding"
 
 INPUT_DIR = Path("/mnt/raid10/datasets-ash/downloads/dpr_gemma/data")

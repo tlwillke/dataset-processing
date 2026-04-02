@@ -1,19 +1,20 @@
 from pathlib import Path
 
-OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/cap-1m")
+OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/temp")
 
 FILE_PREFIX = "Caselaw_gte-Qwen2-1.5B_embeddings"
-SOURCE_TYPE = "fvecs"
-PARQUET_EMBEDDING_COLUMN = None
+SOURCE_TYPE = "parquet"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
+PARQUET_EMBEDDING_COLUMN = "embedding"
 
 INPUT_DIR = Path("/mnt/raid10/datasets-ash/downloads/cap/data/TeraflopAI___Caselaw_Access_Project___Alibaba-NLP___gte-Qwen2-1.5B-instruct_clusters")
 
 SELECTION_MODE = "first_n"
 EXPLICIT_INPUT_FILES = []
-FIRST_N = 200
+FIRST_N = 800
 
 SELECT_SUBSTRINGS = []
-EXCLUDE_SUBSTRINGS = []
+EXCLUDE_SUBSTRINGS = ["cluster_0.parquet"]
 ALLOWED_SUFFIXES = [".parquet"]
 
 NUM_QUERY = 10000

@@ -1,9 +1,10 @@
 from pathlib import Path
 
-OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/cap-10m")
+OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/temp")
 
 FILE_PREFIX = "cap_embeddings"
 SOURCE_TYPE = "parquet"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
 PARQUET_EMBEDDING_COLUMN = "embedding"
 
 INPUT_DIR = Path("/mnt/raid10/datasets-ash/downloads/cap/data/TeraflopAI___Caselaw_Access_Project___Alibaba-NLP___gte-Qwen2-1.5B-instruct_clusters")

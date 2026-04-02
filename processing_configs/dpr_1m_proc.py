@@ -1,9 +1,10 @@
 from pathlib import Path
 
-OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/dpr-1m")
+OUTPUT_DIR = Path("/home/ted_willke/datasets-ash/temp")
 
 FILE_PREFIX = "dpr"
 SOURCE_TYPE = "fvecs"
+READER_BATCH_SIZE = 32768  # Tune for RAM vs throughput.
 PARQUET_EMBEDDING_COLUMN = None
 
 INPUT_DIR = Path("/mnt/raid10/datasets-ash/dpr-10m")

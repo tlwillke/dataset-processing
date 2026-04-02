@@ -45,6 +45,7 @@ from config import (
 )
 from fvecs_writer import append_fvecs, count_fvecs
 from ivecs_check import read_ivecs_info
+from config import READER_BATCH_SIZE
 from readers import build_reader
 
 
@@ -110,7 +111,7 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
 
     validate_input_files()
 
-    reader = build_reader(SOURCE_TYPE, INPUT_FILES, PARQUET_EMBEDDING_COLUMN)
+    reader = build_reader(SOURCE_TYPE, INPUT_FILES, PARQUET_EMBEDDING_COLUMN, READER_BATCH_SIZE)
     logger.info("Reader description: %s", reader.describe())
 
     requested_initial_vectors = None if NUM_BASE is None else (NUM_BASE + NUM_QUERY)
