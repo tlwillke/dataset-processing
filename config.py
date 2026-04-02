@@ -1,7 +1,7 @@
 from pathlib import Path
 import sys
 
-from processing_configs import Caselaw_gte_Qwen2_1_5B_embeddings_1m_proc as dataset
+from processing_configs import personahub_10m_proc as dataset
 
 # ------------------------------------------------------------
 # Run configuration

@@ -4,7 +4,7 @@ from typing import Iterable, Optional
 from huggingface_hub import HfApi, snapshot_download
 
 # Change only this import to choose which repo config to run.
-from download_configs import wiki_mpnet_download as repo
+from download_configs import caselaw_download as repo
 
 # ============================================================
 # Configuration

@@ -6,15 +6,15 @@ FILE_PREFIX = "Caselaw_gte-Qwen2-1.5B_embeddings"
 SOURCE_TYPE = "fvecs"
 PARQUET_EMBEDDING_COLUMN = None
 
-INPUT_DIR = Path("/mnt/raid10/datasets-ash/cap-6m")
+INPUT_DIR = Path("/mnt/raid10/datasets-ash/downloads/cap/data/TeraflopAI___Caselaw_Access_Project___Alibaba-NLP___gte-Qwen2-1.5B-instruct_clusters")
 
-SELECTION_MODE = "explicit"
-EXPLICIT_INPUT_FILES = ["Caselaw_gte-Qwen2-1.5B_embeddings_base_6m_norm_shuffle.fvecs"]
-FIRST_N = 0
+SELECTION_MODE = "first_n"
+EXPLICIT_INPUT_FILES = []
+FIRST_N = 200
 
 SELECT_SUBSTRINGS = []
 EXCLUDE_SUBSTRINGS = []
-ALLOWED_SUFFIXES = [".fvecs"]
+ALLOWED_SUFFIXES = [".parquet"]
 
 NUM_QUERY = 10000
 NUM_BASE = 1000000
