@@ -1,4 +1,7 @@
 .env
-.idea/
 __pycache__/
 runs/
+.idea/*
+!.idea/misc.xml
+!.idea/vcs.xml
+
