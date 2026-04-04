@@ -55,6 +55,22 @@ def write_fvecs(fname, arr):
         formatted.tofile(f)
 
 
+def normalization_error_stats(vecs):
+    norms = np.linalg.norm(vecs, axis=1)
+    errors = np.abs(norms - 1.0)
+
+    if errors.size == 0:
+        return {
+            "max_abs_error": 0.0,
+            "mean_abs_error": 0.0,
+        }
+
+    return {
+        "max_abs_error": float(np.max(errors)),
+        "mean_abs_error": float(np.mean(errors)),
+    }
+
+
 def check_normalization(vecs, tol=1e-3):
     """
     Returns True if all vectors in the array are approximately normalized
@@ -78,15 +94,27 @@ def main():
     parser = argparse.ArgumentParser(description="Normalize vectors in an fvecs file.")
     parser.add_argument("--input", required=True, help="Input fvecs file")
     parser.add_argument("--output", required=True, help="Output normalized fvecs file")
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=1e-3,
+        help="Tolerance for considering vectors already normalized (default: 1e-3)",
+    )
     args = parser.parse_args()
+
+    if args.tolerance < 0:
+        raise ValueError("--tolerance must be non-negative")
 
     vectors = read_fvecs(args.input)
 
-    normalized_before = check_normalization(vectors)
+    normalized_before = check_normalization(vectors, tol=args.tolerance)
+    before_stats = normalization_error_stats(vectors)
+    print(f"Normalization tolerance: {args.tolerance}")
     print("Vectors normalized before:", "Yes" if normalized_before else "No")
+    print(f"Max abs norm error before: {before_stats['max_abs_error']:.8g}")
+    print(f"Mean abs norm error before: {before_stats['mean_abs_error']:.8g}")
     print(f"Vectors: {vectors.shape[0]}")
     print(f"Dimension: {vectors.shape[1] if vectors.size > 0 else 0}")
-
     input_path = os.path.expanduser(args.input)
     output_path = os.path.expanduser(args.output)
 
@@ -101,8 +129,11 @@ def main():
 
     normalized = normalize_vectors(vectors)
 
-    normalized_after = check_normalization(normalized)
+    normalized_after = check_normalization(normalized, tol=args.tolerance)
+    after_stats = normalization_error_stats(normalized)
     print("Vectors normalized after:", "Yes" if normalized_after else "No")
+    print(f"Max abs norm error after: {after_stats['max_abs_error']:.8g}")
+    print(f"Mean abs norm error after: {after_stats['mean_abs_error']:.8g}")
 
     write_fvecs(output_path, normalized)
     print(f"Wrote normalized file to: {output_path}")

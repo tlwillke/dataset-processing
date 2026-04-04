@@ -54,27 +54,41 @@ def write_fvecs(fname, arr):
         formatted.tofile(f)
 
 
-def count_zero_vectors(arr):
-    return int(np.sum(np.all(arr == 0, axis=1)))
+def count_zero_vectors(arr, tol=0.0):
+    norms = np.linalg.norm(arr, axis=1)
+    return int(np.sum(norms <= tol))
 
 
-def remove_zero_vectors(arr):
-    keep_mask = ~np.all(arr == 0, axis=1)
+def remove_zero_vectors(arr, tol=0.0):
+    norms = np.linalg.norm(arr, axis=1)
+    keep_mask = norms > tol
     return np.ascontiguousarray(arr[keep_mask], dtype=np.float32)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Remove exact zero vectors from an fvecs file.")
+    parser = argparse.ArgumentParser(
+        description="Remove vectors whose L2 norm is at or below a tolerance from an fvecs file."
+    )
     parser.add_argument("--input", required=True, help="Input fvecs file")
-    parser.add_argument("--output", required=True, help="Output fvecs file with zero vectors removed")
+    parser.add_argument("--output", required=True, help="Output fvecs file with near-zero vectors removed")
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=0.0,
+        help="Remove vectors with L2 norm <= tolerance (default: 0.0)",
+    )
     args = parser.parse_args()
+
+    if args.tolerance < 0:
+        raise ValueError("--tolerance must be non-negative")
 
     vectors = read_fvecs(args.input)
 
-    zero_count = count_zero_vectors(vectors)
-    print(f"Zero vectors: {zero_count} / {vectors.shape[0]}")
+    zero_count = count_zero_vectors(vectors, tol=args.tolerance)
+    print(f"Zero tolerance: {args.tolerance}")
+    print(f"Zero-like vectors: {zero_count} / {vectors.shape[0]}")
 
-    cleaned = remove_zero_vectors(vectors)
+    cleaned = remove_zero_vectors(vectors, tol=args.tolerance)
 
     if cleaned.shape[0] == 0:
         raise ValueError("All vectors were zero after removal.")

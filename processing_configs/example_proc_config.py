@@ -103,6 +103,16 @@ GT_SHUFFLE = True
 GT_GPUS = "-1"        # "-1" for CPU, e.g. "0" or "0,1" for GPU
 
 # ------------------------------------------------------------
+# Tolerances
+# ------------------------------------------------------------
+
+# Remove vectors whose L2 norm is <= ZERO_TOLERANCE.
+ZERO_TOLERANCE = 0.0
+
+# Consider vectors already normalized when abs(||x|| - 1) < NORMALIZATION_TOLERANCE.
+NORMALIZATION_TOLERANCE = 1e-3
+
+# ------------------------------------------------------------
 # Run behavior
 # ------------------------------------------------------------
 

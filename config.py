@@ -53,6 +53,13 @@ GT_GPUS = dataset.GT_GPUS
 FINAL_GROUND_TRUTH = RUN_DIR / f"{FILE_PREFIX}_gt_{GT_METRIC}_{GT_K}.ivecs"
 
 # ------------------------------------------------------------
+# Tolerances
+# ------------------------------------------------------------
+
+ZERO_TOLERANCE = dataset.ZERO_TOLERANCE
+NORMALIZATION_TOLERANCE = dataset.NORMALIZATION_TOLERANCE
+
+# ------------------------------------------------------------
 # Input data
 # ------------------------------------------------------------
 
@@ -173,6 +180,7 @@ REMOVE_ZEROS_CMD = [
     "fvecs_remove_zeros.py",
     "--input", str(RAW_BASE_FVECS),
     "--output", str(NONZERO_BASE_FVECS),
+    "--tolerance", str(ZERO_TOLERANCE),
 ]
 
 NORMALIZE_CMD = [
@@ -181,6 +189,7 @@ NORMALIZE_CMD = [
     "fvecs_normalize.py",
     "--input", str(NONZERO_BASE_FVECS),
     "--output", str(NORMALIZED_BASE_FVECS),
+    "--tolerance", str(NORMALIZATION_TOLERANCE),
 ]
 
 DEDUP_CMD = [
