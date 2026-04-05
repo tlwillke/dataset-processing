@@ -1,7 +1,7 @@
 from pathlib import Path
 import sys
 
-from processing_configs import dpr_1m_proc as dataset
+from processing_configs import openai_v3_small_1536_100k_proc as dataset
 
 # ------------------------------------------------------------
 # Run configuration
@@ -31,8 +31,8 @@ GROUND_TRUTH_FILE = RUN_DIR / "ground_truth.ivecs"
 DEDUP_REPORT = RUN_DIR / f"{FILE_PREFIX}_dedup_report.txt"
 DEDUP_TEMP_DIR = RUN_DIR / f"{FILE_PREFIX}_dedup_temp"
 
-LOG_FILE = RUN_DIR / "pipeline.log"
-SUMMARY_FILE = RUN_DIR / "summary.json"
+LOG_FILE = RUN_DIR / f"{FILE_PREFIX}_pipeline.log"
+SUMMARY_FILE = RUN_DIR / f"{FILE_PREFIX}_summary.json"
 
 # ------------------------------------------------------------
 # Requested output sizes

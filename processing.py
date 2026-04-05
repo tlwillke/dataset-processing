@@ -25,6 +25,7 @@ from config import (
     GT_GPUS,
     INPUT_FILES,
     LOG_FILE,
+    NORMALIZATION_TOLERANCE,
     NORMALIZE_CMD,
     NONZERO_BASE_FVECS,
     NUM_BASE,
@@ -41,6 +42,7 @@ from config import (
     SPLIT_QPARTS_DIR,
     SPLIT_QUERY_FVECS,
     SUMMARY_FILE,
+    ZERO_TOLERANCE,
     NORMALIZED_BASE_FVECS,
 )
 from fvecs_writer import append_fvecs, count_fvecs
@@ -254,9 +256,23 @@ def run_external_stage(
         bufsize=1,
     )
 
+    stage_metadata = {}
+
     assert process.stdout is not None
     for line in process.stdout:
-        logger.info("[%s] %s", stage_name, line.rstrip())
+        text = line.rstrip()
+        logger.info("[%s] %s", stage_name, text)
+
+        if stage_name == "remove_zeros" and text.startswith("Zero tolerance:"):
+            stage_metadata["zero_tolerance"] = float(text.split(":", 1)[1].strip())
+
+        if stage_name == "normalize":
+            if text.startswith("Normalization tolerance:"):
+                stage_metadata["normalization_tolerance"] = float(text.split(":", 1)[1].strip())
+            elif text.startswith("Max abs norm error after:"):
+                stage_metadata["max_abs_norm_error_after"] = float(text.split(":", 1)[1].strip())
+            elif text.startswith("Mean abs norm error after:"):
+                stage_metadata["mean_abs_norm_error_after"] = float(text.split(":", 1)[1].strip())
 
     returncode = process.wait()
     elapsed = time.time() - start
@@ -274,6 +290,9 @@ def run_external_stage(
         "output_files": [str(p) for p in outputs],
         "outputs": {},
     }
+
+    if stage_metadata:
+        result["metadata"] = stage_metadata
 
     for p in outputs:
         if not p.exists():
@@ -335,6 +354,8 @@ def main() -> None:
     logger.info("File prefix: %s", FILE_PREFIX)
     logger.info("Source type: %s", SOURCE_TYPE)
     logger.info("Parquet embedding column: %s", PARQUET_EMBEDDING_COLUMN)
+    logger.info("Remove zeros tolerance: %s", ZERO_TOLERANCE)
+    logger.info("Normalization tolerance: %s", NORMALIZATION_TOLERANCE)
 
     start = time.time()
     success = True
@@ -343,6 +364,11 @@ def main() -> None:
     summary = {
         "success": True,
         "elapsed_seconds": 0.0,
+        "file_prefix": FILE_PREFIX,
+        "tolerances": {
+            "remove_zeros": ZERO_TOLERANCE,
+            "normalization": NORMALIZATION_TOLERANCE,
+        },
         "stages": {},
         "error": None,
     }
@@ -365,6 +391,19 @@ def main() -> None:
             NORMALIZE_CMD,
             expected_outputs=NORMALIZED_BASE_FVECS,
         )
+
+        normalize_metadata = summary["stages"]["normalize"].get("metadata", {})
+        if "mean_abs_norm_error_after" in normalize_metadata:
+            logger.info(
+                "Normalization mean abs norm error after: %s",
+                normalize_metadata["mean_abs_norm_error_after"],
+            )
+        if "max_abs_norm_error_after" in normalize_metadata:
+            logger.info(
+                "Normalization max abs norm error after: %s",
+                normalize_metadata["max_abs_norm_error_after"],
+            )
+
         if CLEANUP_INTERMEDIATE_FVECS:
             safe_delete(NONZERO_BASE_FVECS, logger)
 
