@@ -1,7 +1,8 @@
 from pathlib import Path
 import sys
 
-from processing_configs import openai_v3_small_1536_100k_proc as dataset
+# Change this import to match whatever dataset processing config you are actually interested in.
+from processing_configs import dbpedia_openai_3_large_3072_1m_proc as dataset
 
 # ------------------------------------------------------------
 # Run configuration
