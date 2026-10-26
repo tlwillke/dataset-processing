@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import json
 import logging
 import shutil
@@ -33,8 +34,10 @@ from config import (
     OVERWRITE,
     PARQUET_EMBEDDING_COLUMN,
     RAW_BASE_FVECS,
+    READER_BATCH_SIZE,
     REMOVE_ZEROS_CMD,
     RUN_DIR,
+    SOURCE_INT8,
     SOURCE_TYPE,
     SPLIT_BASE_FVECS,
     SPLIT_BPARTS_DIR,
@@ -45,9 +48,9 @@ from config import (
     ZERO_TOLERANCE,
     NORMALIZED_BASE_FVECS,
 )
+from bvecs_writer import append_bvecs, count_bvecs
 from fvecs_writer import append_fvecs, count_fvecs
 from ivecs_check import read_ivecs_info
-from config import READER_BATCH_SIZE
 from readers import build_reader
 
 
@@ -113,7 +116,13 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
 
     validate_input_files()
 
-    reader = build_reader(SOURCE_TYPE, INPUT_FILES, PARQUET_EMBEDDING_COLUMN, READER_BATCH_SIZE)
+    reader = build_reader(
+        SOURCE_TYPE,
+        INPUT_FILES,
+        PARQUET_EMBEDDING_COLUMN,
+        READER_BATCH_SIZE,
+        output_dtype="int8" if SOURCE_INT8 else "float32",
+    )
     logger.info("Reader description: %s", reader.describe())
 
     requested_initial_vectors = None if NUM_BASE is None else (NUM_BASE + NUM_QUERY)
@@ -147,7 +156,10 @@ def extract_base_vectors(logger: logging.Logger) -> dict:
                 batch = batch[:remaining]
                 batch_vectors = batch.shape[0]
 
-        append_fvecs(RAW_BASE_FVECS, batch)
+        if SOURCE_INT8:
+            append_bvecs(RAW_BASE_FVECS, batch)
+        else:
+            append_fvecs(RAW_BASE_FVECS, batch)
 
         total_vectors += batch_vectors
         batch_count += 1
@@ -315,6 +327,9 @@ def count_output_file(path: Path) -> tuple[int, int]:
     if suffix == ".fvecs":
         return count_fvecs(path)
 
+    if suffix == ".bvecs":
+        return count_bvecs(path)
+
     if suffix == ".ivecs":
         _, num_rows, row_length = read_ivecs_info(str(path))
         if row_length is None:
@@ -345,7 +360,67 @@ def safe_rename(src: Path, dst: Path, logger: logging.Logger) -> None:
     logger.info("Renamed final artifact: %s -> %s", src, dst)
 
 
+def print_help_and_exit() -> None:
+    from config import (
+        FILE_PREFIX,
+        SOURCE_TYPE,
+        SOURCE_INT8,
+        NUM_BASE,
+        NUM_QUERY,
+        GT_K,
+        GT_METRIC,
+        GT_SHUFFLE,
+        GT_GPUS,
+        RUN_DIR,
+        OVERWRITE,
+        CLEANUP_INTERMEDIATE_FVECS,
+        INPUT_DIR,
+        SELECTION_MODE,
+    )
+    import processing_configs as _pkg
+    import importlib
+    import pkgutil
+
+    configs = sorted(
+        m.name
+        for m in pkgutil.iter_modules(_pkg.__path__)
+        if not m.name.startswith("_")
+    )
+
+    print("usage: processing.py [-h]")
+    print()
+    print("Run the dataset processing pipeline.")
+    print("Select a config by editing the import in config.py.")
+    print()
+    print("Active configuration:")
+    print(f"  file_prefix          : {FILE_PREFIX}")
+    print(f"  source_type          : {SOURCE_TYPE}")
+    print(f"  source_int8          : {SOURCE_INT8}")
+    print(f"  input_dir            : {INPUT_DIR}")
+    print(f"  selection_mode       : {SELECTION_MODE}")
+    print(f"  num_base             : {NUM_BASE}")
+    print(f"  num_query            : {NUM_QUERY}")
+    print(f"  gt_k                 : {GT_K}")
+    print(f"  gt_metric            : {GT_METRIC}")
+    print(f"  gt_shuffle           : {GT_SHUFFLE}")
+    print(f"  gt_gpus              : {GT_GPUS}")
+    print(f"  run_dir              : {RUN_DIR}")
+    print(f"  overwrite            : {OVERWRITE}")
+    print(f"  cleanup_intermediate : {CLEANUP_INTERMEDIATE_FVECS}")
+    print()
+    print("Available processing configs (processing_configs/):")
+    for name in configs:
+        print(f"  {name}")
+    raise SystemExit(0)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-h", "--help", action="store_true", default=False)
+    args, _ = parser.parse_known_args()
+    if args.help:
+        print_help_and_exit()
+
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     logger = setup_logger(LOG_FILE)
 
@@ -353,6 +428,7 @@ def main() -> None:
     logger.info("Run directory: %s", RUN_DIR)
     logger.info("File prefix: %s", FILE_PREFIX)
     logger.info("Source type: %s", SOURCE_TYPE)
+    logger.info("Source INT8 passthrough: %s", SOURCE_INT8)
     logger.info("Parquet embedding column: %s", PARQUET_EMBEDDING_COLUMN)
     logger.info("Remove zeros tolerance: %s", ZERO_TOLERANCE)
     logger.info("Normalization tolerance: %s", NORMALIZATION_TOLERANCE)
@@ -456,11 +532,12 @@ def main() -> None:
         actual_query_count, _ = count_output_file(query_source)
         actual_base_count, _ = count_output_file(base_source)
 
-        final_base_fvecs = RUN_DIR / f"{FILE_PREFIX}_base_{actual_base_count}.fvecs"
-        final_query_fvecs = RUN_DIR / f"{FILE_PREFIX}_query_{actual_query_count}.fvecs"
+        ext = ".bvecs" if SOURCE_INT8 else ".fvecs"
+        final_base_file = RUN_DIR / f"{FILE_PREFIX}_base_{actual_base_count}{ext}"
+        final_query_file = RUN_DIR / f"{FILE_PREFIX}_query_{actual_query_count}{ext}"
 
-        safe_rename(base_source, final_base_fvecs, logger)
-        safe_rename(query_source, final_query_fvecs, logger)
+        safe_rename(base_source, final_base_file, logger)
+        safe_rename(query_source, final_query_file, logger)
         safe_rename(GROUND_TRUTH_FILE, FINAL_GROUND_TRUTH, logger)
 
         if CLEANUP_INTERMEDIATE_FVECS:
@@ -480,8 +557,8 @@ def main() -> None:
         }
 
         summary["final_artifacts"] = {
-            "base": str(final_base_fvecs),
-            "query": str(final_query_fvecs),
+            "base": str(final_base_file),
+            "query": str(final_query_file),
             "ground_truth": str(FINAL_GROUND_TRUTH),
         }
 
