@@ -111,6 +111,28 @@ class FvecsEmbeddingReader(EmbeddingReader):
             "files": [str(p) for p in self.input_files],
         }
 
+def _checked_int8(arr: np.ndarray, path: Path) -> np.ndarray:
+    """Returns arr as signed int8, or raises if any value is not an integer in -128..127.
+
+    A plain cast wraps such values silently (200 becomes -56), which changes distances.
+    Unsigned uint8 data, such as conventional .bvecs files, must be converted first.
+    """
+    if arr.dtype == np.int8:
+        return arr
+    if arr.size == 0:
+        return arr.astype(np.int8)
+    if not np.issubdtype(arr.dtype, np.number):
+        raise ValueError(f"{path}: embedding values have type {arr.dtype}, not numeric")
+    if np.issubdtype(arr.dtype, np.floating) and not np.all(np.isfinite(arr) & (arr == np.round(arr))):
+        raise ValueError(f"{path}: embedding values are not all integers; cannot read them as int8")
+    lo, hi = arr.min(), arr.max()
+    if lo < -128 or hi > 127:
+        raise ValueError(
+            f"{path}: embedding values range from {lo} to {hi}, outside signed int8 (-128..127)"
+        )
+    return arr.astype(np.int8)
+
+
 class ParquetEmbeddingReader(EmbeddingReader):
 
     def __init__(
@@ -161,6 +183,9 @@ class ParquetEmbeddingReader(EmbeddingReader):
                 arr = flattened_data.reshape(num_rows, dim)
 
                 self.current_file = str(path)
+
+                if dtype == np.int8:
+                    arr = _checked_int8(arr, path)
 
                 yield np.ascontiguousarray(arr, dtype=dtype)
 

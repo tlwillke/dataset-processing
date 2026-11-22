@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 
 # Change this import to match whatever dataset processing config you are actually interested in.
-from processing_configs import wiki_multilingual_v3_int8_1m_proc as dataset
+from processing_configs import dbpedia_openai_3_large_3072_1m_proc as dataset
 
 # ------------------------------------------------------------
 # Run configuration

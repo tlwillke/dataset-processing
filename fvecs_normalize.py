@@ -173,10 +173,8 @@ def main():
             print(f"Copied input to output without changes: {output_path}")
         else:
             print("Input and output are the same file. No action needed.")
-        # Emit stats that processing.py parses so the summary is complete.
-        print("Vectors normalized before: Yes")
-        print("Max abs norm error after: 0")
-        print("Mean abs norm error after: 0")
+        # processing.py records this line; no norm statistics apply to unnormalized vectors.
+        print("Normalization skipped: int8 input")
         return
 
     vectors = read_fvecs(args.input)

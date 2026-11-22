@@ -281,6 +281,8 @@ def run_external_stage(
         if stage_name == "normalize":
             if text.startswith("Normalization tolerance:"):
                 stage_metadata["normalization_tolerance"] = float(text.split(":", 1)[1].strip())
+            elif text.startswith("Normalization skipped:"):
+                stage_metadata["normalization_skipped"] = text.split(":", 1)[1].strip()
             elif text.startswith("Max abs norm error after:"):
                 stage_metadata["max_abs_norm_error_after"] = float(text.split(":", 1)[1].strip())
             elif text.startswith("Mean abs norm error after:"):

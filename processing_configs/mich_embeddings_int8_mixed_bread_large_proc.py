@@ -1,6 +1,6 @@
 from pathlib import Path
 
-OUTPUT_DIR = Path("/home/ubuntu/dataset_cache/int8-datasets/processed/mich-embeddings-int8-mixed-bread-large-1m")
+OUTPUT_DIR = Path("/home/ubuntu/dataset_cache/int8-datasets/processed/mich-embeddings-int8-mixed-bread-large")
 
 FILE_PREFIX = "mich_int8_mixed_bread_large"
 SOURCE_TYPE = "parquet"
@@ -18,7 +18,7 @@ EXCLUDE_SUBSTRINGS = []
 ALLOWED_SUFFIXES = [".parquet"]
 
 NUM_QUERY = 10000
-NUM_BASE = 1000000
+NUM_BASE = None  # all remaining vectors: mich has 82,813 in all
 
 GT_K = 100
 GT_METRIC = "ip"
